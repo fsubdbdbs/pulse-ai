@@ -204,36 +204,3 @@ def receive():
 
     return jsonify({"ok": True, "id": msg["id"]})
 
-
-# ---------------------------------------------------------------------------
-# Static file fallback — Flask serves index.html, sw.js, icons, manifest
-# ---------------------------------------------------------------------------
-import os as _os
-_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
-
-
-@app.route("/sw.js")
-def _sw():
-    from flask import make_response, send_from_directory
-    resp = make_response(send_from_directory(_ROOT, "sw.js"))
-    resp.headers["Service-Worker-Allowed"] = "/"
-    return resp
-
-
-@app.route("/manifest.json")
-def _manifest():
-    from flask import send_from_directory
-    return send_from_directory(_ROOT, "manifest.json")
-
-
-@app.route("/icons/<path:filename>")
-def _icons(filename):
-    from flask import send_from_directory
-    return send_from_directory(_os.path.join(_ROOT, "icons"), filename)
-
-
-@app.route("/", defaults={"path": ""})
-@app.route("/<path:path>")
-def _catch_all(path):
-    from flask import send_from_directory
-    return send_from_directory(_ROOT, "index.html")
