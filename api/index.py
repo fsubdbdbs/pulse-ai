@@ -1,12 +1,4 @@
-"""Pulse AI — Vercel serverless API.
-
-Routes (all prefixed /api/):
-  GET  /config        — VAPID public key (no auth)
-  POST /login         — PIN → JWT
-  GET  /messages      — stored AI messages (JWT)
-  POST /subscribe     — save push subscription (JWT)
-  POST /receive       — accept AI message from VPS (CRON_SECRET)
-"""
+"""Pulse AI — Vercel serverless API."""
 from __future__ import annotations
 
 import base64
@@ -17,7 +9,9 @@ import os
 import time
 import urllib.request
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, make_response, request, send_from_directory
+
+_STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
 app = Flask(__name__)
 
@@ -214,4 +208,31 @@ def receive():
     _send_push(msg["title"], preview)
 
     return jsonify({"ok": True, "id": msg["id"]})
+
+
+# ---------------------------------------------------------------------------
+# Static files (bundled inside api/static/)
+# ---------------------------------------------------------------------------
+
+@app.route("/sw.js")
+def _sw():
+    resp = make_response(send_from_directory(_STATIC, "sw.js"))
+    resp.headers["Service-Worker-Allowed"] = "/"
+    return resp
+
+
+@app.route("/manifest.json")
+def _manifest():
+    return send_from_directory(_STATIC, "manifest.json")
+
+
+@app.route("/icons/<path:filename>")
+def _icons(filename):
+    return send_from_directory(os.path.join(_STATIC, "icons"), filename)
+
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def _catch_all(path):
+    return send_from_directory(_STATIC, "index.html")
 
