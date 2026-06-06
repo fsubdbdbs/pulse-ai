@@ -144,6 +144,17 @@ def config():
     return jsonify({"vapid_public_key": _VAPID_PUB})
 
 
+@app.route("/api/debug")
+def debug():
+    return jsonify({
+        "path": request.path,
+        "pin_set": bool(_PIN),
+        "pin_len": len(_PIN),
+        "secret_set": bool(_SECRET),
+        "kv_set": bool(_KV_URL),
+    })
+
+
 @app.route("/api/login", methods=["POST", "OPTIONS"])
 def login():
     if request.method == "OPTIONS":
