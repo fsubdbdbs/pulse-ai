@@ -140,11 +140,11 @@ def config():
 
 @app.route("/api/debug")
 def debug():
+    stripped = _PIN.strip()
     return jsonify({
-        "path": request.path,
         "pin_set": bool(_PIN),
-        "pin_len": len(_PIN),
-        "secret_set": bool(_SECRET),
+        "pin_len": len(stripped),
+        "pin_is_2137": stripped == "2137",
         "kv_set": bool(_KV_URL),
     })
 
