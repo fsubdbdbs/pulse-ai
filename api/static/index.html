@@ -250,7 +250,7 @@ function escapeHtml(s) {
   return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 
-function renderMessages(msgs) {
+function renderMessages(msgs, isDemo = false) {
   $("loading").style.display = "none";
   if (!msgs || msgs.length === 0) {
     $("feed").style.display = "none";
@@ -261,6 +261,14 @@ function renderMessages(msgs) {
   const feed = $("feed");
   feed.style.display = "flex";
   feed.innerHTML = "";
+
+  if (isDemo) {
+    const banner = document.createElement("div");
+    banner.style.cssText = "font-size:11px;color:var(--muted);text-align:center;padding:4px 0 8px;letter-spacing:0.5px;text-transform:uppercase;";
+    banner.textContent = "Przykładowe wiadomości — pojawią się po pierwszym treningu";
+    feed.appendChild(banner);
+  }
+
   msgs.forEach(msg => {
     const card = document.createElement("div");
     card.className = "card";
@@ -279,15 +287,87 @@ function renderMessages(msgs) {
   });
 }
 
+const DEMO_MESSAGES = [
+  {
+    id: "demo1", type: "sleep", ts: Date.now() / 1000 - 3600 * 2,
+    title: "Raport poranny",
+    content: `RAPORT GOTOWOŚCI — 07.06.2026
+━━━━━━━━━━━━━━━━━━━━━━━━━
+WYNIK REGENERACJI: 78/100
+
+SEN
+• Czas: 7h 23min  (score: 82/100)
+• Fazy: deep 94min | REM 87min | light 143min | awake 20min
+• Zaśnięcie: 23:12
+
+TĘTNO
+• Spoczynkowe: 52 bpm
+• HRV: 68 ms
+
+GOTOWOŚĆ DNIA
+Dobra noc, Franek. 7h 23min z wynikiem 82 to solidna regeneracja.
+HRV 68ms jest powyżej twojej normy — układ nerwowy wypoczęty.
+RHR 52 bpm potwierdza dobry stan.
+
+REKOMENDACJA
+Dzień na pełnej mocy — możesz trenować intensywnie.
+Nawodnij się przed treningiem (min. 500ml przed).
+━━━━━━━━━━━━━━━━━━━━━━━━━`
+  },
+  {
+    id: "demo2", type: "workout", ts: Date.now() / 1000 - 3600 * 5,
+    title: "Analiza treningu",
+    content: `ANALIZA TRENINGU — Bieganie  07.06.2026
+━━━━━━━━━━━━━━━━━━━━━━━━━
+OBCIĄŻENIE
+• Czas: 45min | Dystans: 7.2 km
+• Tętno avg: 158 bpm | max: 176 bpm | Kalorie: 487 kcal
+
+OCENA SESJI
+Franek, solidna sesja aerobowa. Średnie tętno 158 bpm
+utrzymane przez 45min to dobra praca w strefie cardio.
+Tempo ~6:15/km jest dla ciebie komfortowe — widzę progres
+względem poprzednich treningów.
+
+REGENERACJA
+36h do pełnej regeneracji mięśniowej. Jutro maksymalnie
+spacer lub stretching. Zadbaj o białko (min. 30g) w ciągu
+2h po treningu.
+━━━━━━━━━━━━━━━━━━━━━━━━━`
+  },
+  {
+    id: "demo3", type: "evening", ts: Date.now() / 1000 - 3600 * 14,
+    title: "Wieczorne podsumowanie",
+    content: `PODSUMOWANIE — 06.06.2026
+━━━━━━━━━━━━━━━━━━━━━━━━━
+AKTYWNOŚĆ
+• Kroki: 9 243  (cel: 8 000) ✓
+• Kalorie: 2 847 kcal
+• AZM: 42 min
+
+TRENING
+Bieganie 45min — solidna sesja kardio. Tętno avg 158 bpm
+świadczy o intensywności w strefie cardio. Dobrze.
+
+REGENERACJA NA JUTRO
+Po dzisiejszym treningu potrzebujesz ok. 24–36h regeneracji.
+Jutro lżejszy dzień lub stretching. Zaśnij przed 23:00
+i nadbij nawodnienie wieczorem.
+━━━━━━━━━━━━━━━━━━━━━━━━━`
+  }
+];
+
 async function loadMessages() {
   try {
     const resp = await fetch("/api/messages");
     const msgs = await resp.json();
-    renderMessages(msgs);
+    if (msgs && msgs.length > 0) {
+      renderMessages(msgs);
+    } else {
+      renderMessages(DEMO_MESSAGES, true);
+    }
   } catch {
-    showToast("Błąd połączenia — spróbuj ponownie");
-    $("loading").style.display = "none";
-    $("empty").classList.add("visible");
+    renderMessages(DEMO_MESSAGES, true);
   }
 }
 
