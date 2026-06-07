@@ -234,7 +234,5 @@ def _icons(filename):
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def _catch_all(path):
-    if request.path.startswith("/api/"):
-        return jsonify({"bug": "catch_all_hit", "request_path": request.path, "route_var": path}), 404
-    return send_from_directory(_STATIC, "index.html")
+    return jsonify({"flask": True, "request_path": request.path, "route_var": path})
 
