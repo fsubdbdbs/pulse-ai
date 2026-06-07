@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import base64
-import hashlib
 import hmac
 import json
 import os
@@ -15,8 +14,6 @@ _STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
 app = Flask(__name__)
 
-_PIN         = os.environ.get("APP_PIN", "")
-_SECRET      = os.environ.get("APP_SECRET", "change-me").encode()
 _CRON_SECRET = os.environ.get("CRON_SECRET", "")
 _KV_URL      = os.environ.get("KV_REST_API_URL", "")
 _KV_TOKEN    = os.environ.get("KV_REST_API_TOKEN", "")
@@ -26,7 +23,7 @@ _VAPID_SUB   = os.environ.get("VAPID_SUBJECT", "mailto:pulse@local")
 
 
 # ---------------------------------------------------------------------------
-# Upstash / Vercel KV  (REST pipeline, no extra deps)
+# Upstash / Vercel KV
 # ---------------------------------------------------------------------------
 
 def _kv(*cmd) -> object:
@@ -53,44 +50,12 @@ def kv_set(key: str, value: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Minimal JWT (HS256, no external deps)
+# Helpers
 # ---------------------------------------------------------------------------
 
 def _b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
-
-def _make_token() -> str:
-    hdr = _b64url(b'{"alg":"HS256","typ":"JWT"}')
-    pay = _b64url(json.dumps({"exp": int(time.time()) + 86400 * 30}).encode())
-    sig_in = f"{hdr}.{pay}".encode()
-    sig = _b64url(hmac.new(_SECRET, sig_in, hashlib.sha256).digest())
-    return f"{hdr}.{pay}.{sig}"
-
-
-def _verify_token(token: str) -> bool:
-    try:
-        h, p, s = token.split(".")
-        sig_in = f"{h}.{p}".encode()
-        expected = _b64url(hmac.new(_SECRET, sig_in, hashlib.sha256).digest())
-        if not hmac.compare_digest(s, expected):
-            return False
-        pad = 4 - len(p) % 4
-        data = json.loads(base64.urlsafe_b64decode(p + "=" * (pad % 4)))
-        return data.get("exp", 0) > int(time.time())
-    except Exception:
-        return False
-
-
-def _authenticated() -> bool:
-    auth = request.headers.get("Authorization", "")
-    token = auth.removeprefix("Bearer ").strip()
-    return bool(token) and _verify_token(token)
-
-
-# ---------------------------------------------------------------------------
-# Web Push
-# ---------------------------------------------------------------------------
 
 def _send_push(title: str, body_text: str) -> None:
     raw = kv_get("pulse_sub")
@@ -118,13 +83,13 @@ def _send_push(title: str, body_text: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# CORS helper
+# CORS
 # ---------------------------------------------------------------------------
 
 @app.after_request
 def _add_cors(resp):
     resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, X-Cron-Secret"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Cron-Secret"
     resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return resp
 
@@ -140,31 +105,13 @@ def config():
 
 @app.route("/api/debug")
 def debug():
-    stripped = _PIN.strip()
-    return jsonify({
-        "pin_set": bool(_PIN),
-        "pin_len": len(stripped),
-        "pin_is_2137": stripped == "2137",
-        "kv_set": bool(_KV_URL),
-    })
-
-
-@app.route("/api/login", methods=["POST", "OPTIONS"])
-def login():
-    if request.method == "OPTIONS":
-        return "", 204
-    body = request.get_json(silent=True) or {}
-    if str(body.get("pin", "")).strip() == str(_PIN).strip():
-        return jsonify({"token": _make_token()})
-    return jsonify({"error": "Nieprawidłowy PIN"}), 401
+    return jsonify({"ok": True, "kv_set": bool(_KV_URL)})
 
 
 @app.route("/api/messages", methods=["GET", "OPTIONS"])
 def messages():
     if request.method == "OPTIONS":
         return "", 204
-    if not _authenticated():
-        return jsonify({"error": "unauthorized"}), 401
     raw = kv_get("pulse_messages") or "[]"
     return jsonify(json.loads(raw))
 
@@ -173,8 +120,6 @@ def messages():
 def subscribe():
     if request.method == "OPTIONS":
         return "", 204
-    if not _authenticated():
-        return jsonify({"error": "unauthorized"}), 401
     sub = request.get_json(silent=True)
     if not sub:
         return jsonify({"error": "bad body"}), 400
@@ -211,7 +156,7 @@ def receive():
 
 
 # ---------------------------------------------------------------------------
-# Static files (bundled inside api/static/)
+# Static files
 # ---------------------------------------------------------------------------
 
 @app.route("/sw.js")
@@ -234,5 +179,4 @@ def _icons(filename):
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def _catch_all(path):
-    return jsonify({"flask": True, "request_path": request.path, "route_var": path})
-
+    return send_from_directory(_STATIC, "index.html")
