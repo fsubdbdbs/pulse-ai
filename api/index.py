@@ -8,9 +8,7 @@ import os
 import time
 import urllib.request
 
-from flask import Flask, jsonify, make_response, request, send_from_directory
-
-_STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
@@ -21,10 +19,6 @@ _VAPID_PUB   = os.environ.get("VAPID_PUBLIC_KEY", "")
 _VAPID_PRIV  = os.environ.get("VAPID_PRIVATE_KEY", "")
 _VAPID_SUB   = os.environ.get("VAPID_SUBJECT", "mailto:pulse@local")
 
-
-# ---------------------------------------------------------------------------
-# Upstash / Vercel KV
-# ---------------------------------------------------------------------------
 
 def _kv(*cmd) -> object:
     body = json.dumps([list(cmd)]).encode()
@@ -48,10 +42,6 @@ def kv_get(key: str) -> str | None:
 def kv_set(key: str, value: str) -> None:
     _kv("SET", key, value)
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
@@ -82,10 +72,6 @@ def _send_push(title: str, body_text: str) -> None:
             pass
 
 
-# ---------------------------------------------------------------------------
-# CORS
-# ---------------------------------------------------------------------------
-
 @app.after_request
 def _add_cors(resp):
     resp.headers["Access-Control-Allow-Origin"] = "*"
@@ -94,10 +80,6 @@ def _add_cors(resp):
     return resp
 
 
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
-
 @app.route("/api/config")
 def config():
     return jsonify({"vapid_public_key": _VAPID_PUB})
@@ -105,7 +87,7 @@ def config():
 
 @app.route("/api/debug")
 def debug():
-    return jsonify({"ok": True, "kv_set": bool(_KV_URL)})
+    return jsonify({"ok": True, "kv_set": bool(_KV_URL), "path": request.path})
 
 
 @app.route("/api/messages", methods=["GET", "OPTIONS"])
@@ -153,30 +135,3 @@ def receive():
     _send_push(msg["title"], preview)
 
     return jsonify({"ok": True, "id": msg["id"]})
-
-
-# ---------------------------------------------------------------------------
-# Static files
-# ---------------------------------------------------------------------------
-
-@app.route("/sw.js")
-def _sw():
-    resp = make_response(send_from_directory(_STATIC, "sw.js"))
-    resp.headers["Service-Worker-Allowed"] = "/"
-    return resp
-
-
-@app.route("/manifest.json")
-def _manifest():
-    return send_from_directory(_STATIC, "manifest.json")
-
-
-@app.route("/icons/<path:filename>")
-def _icons(filename):
-    return send_from_directory(os.path.join(_STATIC, "icons"), filename)
-
-
-@app.route("/", defaults={"path": ""})
-@app.route("/<path:path>")
-def _catch_all(path):
-    return send_from_directory(_STATIC, "index.html")
